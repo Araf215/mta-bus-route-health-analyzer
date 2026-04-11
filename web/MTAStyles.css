@@ -1,0 +1,446 @@
+/* Color palette and shared layout values */
+:root {
+  --bg: #f6fbf7;
+  --white: #ffffff;
+  --primary: #69b86f;
+  --primary-dark: #4f9f59;
+  --primary-soft: #e8f6ea;
+  --text: #18231b;
+  --muted: #5f6f63;
+  --border: #dfeee1;
+  --shadow: 0 10px 30px rgba(50, 90, 60, 0.08);
+  --shadow-soft: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  --container: 1180px;
+}
+
+/* Global reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Base page styling */
+body {
+  font-family: "Inter", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Shared page width container */
+.container {
+  width: min(92%, var(--container));
+  margin: 0 auto;
+}
+
+/* Top navigation bar */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-inner {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.brand {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--primary-dark);
+  letter-spacing: -0.02em;
+}
+
+.nav-links a {
+  padding: 10px 14px;
+  border-radius: 10px;
+  transition: 0.2s ease;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.nav-links a:hover {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+/* Hero / intro banner */
+.hero {
+  background: linear-gradient(135deg, #69b86f 0%, #5cab64 50%, #4f9f59 100%);
+  color: white;
+  padding: 92px 0 82px;
+}
+
+.hero-content {
+  max-width: 860px;
+}
+
+.eyebrow {
+  display: inline-block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+  opacity: 0.96;
+}
+
+.hero h1 {
+  font-size: clamp(2.5rem, 5vw, 4.2rem);
+  line-height: 1.06;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 18px;
+}
+
+.subtitle {
+  font-size: 1.13rem;
+  max-width: 760px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* Main page sections */
+.main-content {
+  padding: 70px 0;
+  display: grid;
+  gap: 30px;
+}
+
+/* Reusable white card */
+.content-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  padding: 28px;
+}
+
+.content-card h2 {
+  font-size: 1.45rem;
+  margin-bottom: 12px;
+  color: var(--primary-dark);
+  letter-spacing: -0.02em;
+}
+
+.content-card h3 {
+  font-size: 1.02rem;
+  margin-bottom: 8px;
+  color: var(--primary-dark);
+}
+
+.content-card p {
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+/* Filter dropdown layout for Phase 2 route selection */
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.filter-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--primary-dark);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.filter-group select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--white);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+.filter-group select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(105, 184, 111, 0.12);
+}
+
+/* Section header with title and subtitle */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+}
+
+.section-subtitle {
+  color: var(--muted);
+  font-size: 0.98rem;
+  margin-top: -2px;
+}
+
+/* Top score summary box */
+.score-box {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 16px;
+  background: var(--primary-soft);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.score-line + .score-line {
+  margin-top: 4px;
+}
+
+/* Leaflet live map */
+#liveMap {
+  width: 100%;
+  height: 540px;
+  margin-top: 14px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+/* Graph layout */
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.chart-card {
+  min-height: 420px;
+}
+
+.chart-wrap {
+  height: 330px;
+  margin-top: 8px;
+}
+
+/* Info card layouts */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 24px;
+}
+
+.small-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* Mini stat cards */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.mini-stat {
+  background: linear-gradient(180deg, #edf7ef 0%, #e8f3ea 100%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--shadow-soft);
+}
+
+.mini-stat-label {
+  display: block;
+  font-size: 0.92rem;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.mini-stat-value {
+  display: block;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+/* Status and score explanation pills */
+.status-list,
+.metric-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status-pill,
+.metric-pill {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--primary-soft);
+  color: var(--text);
+}
+
+/* Stacked text layout for problem / solution */
+.stacked-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 4px;
+}
+
+.stacked-block h3 {
+  color: var(--primary-dark);
+  font-size: 1.28rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.stacked-block p {
+  color: var(--muted);
+  font-size: 1.12rem;
+  line-height: 1.8;
+}
+
+/* Table styling */
+.table-wrap {
+  overflow-x: auto;
+}
+
+.bus-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.bus-table th,
+.bus-table td {
+  text-align: left;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.bus-table th {
+  color: var(--primary-dark);
+  font-weight: 800;
+  font-size: 0.98rem;
+}
+
+.bus-table td {
+  color: var(--text);
+  font-size: 0.97rem;
+}
+
+/* Leaflet popup styling */
+.leaflet-popup-content-wrapper {
+  border-radius: 14px;
+}
+
+.leaflet-popup-content {
+  font-family: "Inter", sans-serif;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* Footer */
+footer {
+  padding: 30px 0 52px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.96rem;
+}
+
+/* Medium screen support */
+@media (max-width: 1100px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .filter-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Tablet / smaller laptop support */
+@media (max-width: 980px) {
+  .chart-grid,
+  .info-grid,
+  .summary-grid,
+  .small-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-card {
+    min-height: 380px;
+  }
+
+  .chart-wrap {
+    height: 300px;
+  }
+
+  #liveMap {
+    height: 450px;
+  }
+}
+
+/* Mobile support */
+@media (max-width: 760px) {
+  .nav-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 14px 0;
+  }
+
+  .brand {
+    font-size: 1.28rem;
+  }
+
+  .hero {
+    padding: 72px 0 60px;
+  }
+
+  .hero h1 {
+    font-size: 2.55rem;
+  }
+
+  .subtitle {
+    font-size: 1.02rem;
+  }
+
+  .main-content {
+    padding: 50px 0;
+  }
+
+  .content-card {
+    padding: 22px;
+    border-radius: 18px;
+  }
+
+  .content-card h2 {
+    font-size: 1.28rem;
+  }
+
+  #liveMap {
+    height: 360px;
+  }
+
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+}

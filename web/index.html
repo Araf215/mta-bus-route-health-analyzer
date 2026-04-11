@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Basic page setup -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Browser tab title -->
+  <title>MTA Route Health Monitor | Araf Hoque</title>
+
+  <!-- Google font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  >
+
+  <!-- Importing CSS & Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <link rel="stylesheet" href="./MTAStyles.css" />
+</head>
+<body>
+  <!-- Nav Bar: redirects back to my portfolio and also my name label -->
+  <nav class="navbar">
+    <div class="container nav-inner">
+      <a href="index.html" class="brand">Aoanul "Araf" Hoque</a>
+      <div class="nav-links">
+        <a href="index.html">Back to Portfolio</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="container hero-content">
+      <!-- Introduction: Website Description, name, and tags -->
+      <p class="eyebrow">Independent Engineering Project • Live MTA Bus System Analysis</p>
+      <h1>MTA Route Health Monitor</h1>
+      <p class="subtitle">
+        A live dashboard that tracks what is happening on MTA bus routes using real-time bus data.
+        This version focuses on practical route health signals, like how many buses are in service, how many are in layover,
+        and how actively buses on the route are moving over time.
+      </p>
+    </div>
+  </header>
+
+  <main class="container main-content">
+    <!-- New filter section for Phase 2 expansion -->
+    <section class="content-card">
+      <h2>Route Filters</h2>
+      <div class="filter-grid">
+        <div class="filter-group">
+          <label for="boroughSelect">Borough</label>
+          <select id="boroughSelect">
+            <option>Loading...</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="routeSelect">Route</label>
+          <select id="routeSelect">
+            <option>Loading...</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="directionSelect">Direction</label>
+          <select id="directionSelect">
+            <option>Loading...</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-card intro-card">
+      <!-- Project overview and more into specifics -->
+      <h2>Project Overview</h2>
+      <p>
+        This project turns live MTA bus data into a dashboard that shows how a route is performing in real time.
+        It tracks the current buses on a selected route, highlights which buses are actively in service,
+        identifies layovers, measures short-term movement, and summarizes those signals into an easy-to-read view of route health.
+      </p>
+      <div id="scoreBox" class="score-box">Loading live metrics...</div>
+    </section>
+
+    <section class="content-card map-card">
+      <div class="section-header">
+        <div>
+          <!-- Route Map & Breakdown -->
+          <h2>Live Route Map</h2>
+          <p class="section-subtitle">
+            Green markers are moving in-service buses, yellow markers are in-service but mostly stationary,
+            and gray markers are layovers or no-progress buses.
+          </p>
+        </div>
+      </div>
+      <div id="liveMap"></div>
+    </section>
+
+    <section class="info-grid">
+      <div class="content-card">
+        <!-- Updated every minute. Current Route Snapshot with stat cards. -->
+        <h2>Current Route Snapshot (Updated Every Minute)</h2>
+        <div class="summary-grid">
+          <div class="mini-stat">
+            <span class="mini-stat-label">Total Buses</span>
+            <span id="totalBusesStat" class="mini-stat-value">--</span>
+          </div>
+          <div class="mini-stat">
+            <span class="mini-stat-label">In-Service Buses</span>
+            <span id="inServiceStat" class="mini-stat-value">--</span>
+          </div>
+          <div class="mini-stat">
+            <span class="mini-stat-label">Layover Buses</span>
+            <span id="layoverStat" class="mini-stat-value">--</span>
+          </div>
+          <div class="mini-stat">
+            <span class="mini-stat-label">Moving Buses</span>
+            <span id="movingStat" class="mini-stat-value">--</span>
+          </div>
+          <div class="mini-stat">
+            <span class="mini-stat-label">Movement Ratio</span>
+            <span id="movementRatioStat" class="mini-stat-value">--</span>
+          </div>
+          <div class="mini-stat">
+            <span class="mini-stat-label">Average Movement</span>
+            <span id="avgMoveStat" class="mini-stat-value">--</span>
+          </div>
+          <div class="mini-stat">
+            <span class="mini-stat-label">Average Speed</span>
+            <span id="avgSpeedStat" class="mini-stat-value">--</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-card">
+        <!-- A short summary of what the metrics actually mean. For viewers benefit.  -->
+        <h2>System Status</h2>
+        <div id="systemStatus" class="status-list">
+          <div class="status-pill">Loading current route health...</div>
+        </div>
+      </div>
+
+      <!-- A score breakdown of how the metrics are used to determine route health. (purely heuristic)  -->
+      <div class="content-card">
+        <h2>Score Breakdown</h2>
+        <div id="scoreBreakdown" class="metric-list">
+          <div class="metric-pill">Loading score breakdown...</div>
+        </div>
+      </div>
+
+      <!-- Problem & Solution (what problem is my project trying to solve)  -->
+      <div class="content-card">
+        <h2>Problem / Solution</h2>
+        <div class="stacked-copy">
+          <div class="stacked-block">
+            <h3>Problem</h3>
+            <p id="problemText">...</p>
+          </div>
+          <div class="stacked-block">
+            <h3>Solution</h3>
+            <p id="solutionText">...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Brief explanation of how the backend and frontend work together -->
+    <section class="small-info-grid">
+      <div class="content-card">
+        <h2>Method</h2>
+        <p id="methodText">Loading method...</p>
+      </div>
+
+      <!-- Main limitations of the live feed and current scoring model -->
+      <div class="content-card">
+        <h2>Limits</h2>
+        <p id="limitsText">Loading limits...</p>
+      </div>
+    </section>
+
+    <section class="chart-grid">
+      <!-- Recent trend charts use smoothed data so short-term API noise does not disturb -->
+      <!-- How many buses are in-service, layover, moving, and total buses (last 5 minutes)  -->
+      <div class="content-card chart-card">
+        <h2>Buses Over Time (Smoothed)</h2>
+        <div class="chart-wrap">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Ratio of buses moving & the average meters the buses moved  -->
+      <div class="content-card chart-card">
+        <h2>Movement Trend (Smoothed)</h2>
+        <div class="chart-wrap">
+          <canvas id="movementChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-card">
+      <!-- Live bus table showing next stop, service type, recent movement, and estimated speed -->
+      <h2>Live Buses</h2>
+      <div class="table-wrap">
+        <table class="bus-table">
+          <thead>
+            <tr>
+              <th>Bus</th>
+              <th>Next Stop</th>
+              <th>Service Type</th>
+              <th>In Service</th>
+              <th>Moved</th>
+              <th>Speed</th>
+            </tr>
+          </thead>
+          <tbody id="busTableBody">
+            <tr>
+              <td colspan="6">Loading Buses...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      © 2026 Araf Hoque. All rights reserved.
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
