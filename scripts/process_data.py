@@ -20,9 +20,9 @@ PROCESSED_DIR = os.path.join("data", "processed")
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 OUTPUT_PATH = os.path.join(PROCESSED_DIR, "all_routes_live_metrics.json")
 
-MAX_HISTORY_POINTS = int(os.getenv("MAX_RAW_SNAPSHOTS", "180")) # Only 180 snapshots can be processed at once (efficiency)
+MAX_HISTORY_POINTS = int(os.getenv("MAX_RAW_SNAPSHOTS", "90")) # Only 90 snapshots can be processed at once (efficiency)
 SMOOTHING_WINDOW = 5 # Use the last 5 computed route points to reduce short-term api noise
-MIN_MOVEMENT_METERS = 15 # Bus needs to move at least 15 meters between snapshots (recorded every minute)
+MIN_MOVEMENT_METERS = 25 # Bus needs to move at least 25 meters between snapshots (recorded every minute)
 
 
 def load_jsonl(path): # Reads the raw JSON snapshot
@@ -73,16 +73,17 @@ def haversine_meters(lat1, lon1, lat2, lon2): # Using the haversine formula I ca
     return 2 * r * math.asin(math.sqrt(a))
 
 
-def is_in_service(bus): # Determines if a bus is in layover or noprogress
+def is_layover(bus):
+    # Checks the MTA status fields to see if the bus is actually in a layover
     progress_rate = str(bus.get("progress_rate") or "").strip().lower()
     progress_status = str(bus.get("progress_status") or "").strip().lower()
 
-    if progress_status == "layover": # Layover buses: A bus that is temporarily out of active service
-        return False
-    if progress_rate == "noprogress": # A bus that is currently not showing movement according to the MTA
-        return False
-    return True
+    return progress_rate == "layover" or "layover" in progress_status
 
+
+def is_in_service(bus):
+    # A bus can still be in service even if it is stopped, so only exclude actual layovers
+    return not is_layover(bus)
 
 def classify_service(bus): # classifies bus as sbs or local
     route_name = str(
@@ -203,7 +204,10 @@ def compute_bus_movements(current_snapshot, previous_snapshot): # Estimate movem
             "moved_meters": round(moved_meters, 2), # Distance moved
             "seconds_elapsed": round(seconds_elapsed, 2) if seconds_elapsed is not None else None, # Time between positions
             "meters_per_minute": round(meters_per_minute, 2) if meters_per_minute is not None else None,  # estimated movement rate
-            "is_moving_by_position": moved_meters >= MIN_MOVEMENT_METERS, # Whether it moved at least 15 meters
+            "is_moving_by_position": (
+                meters_per_minute is not None
+                and meters_per_minute >= MIN_MOVEMENT_METERS
+            ), # Whether it moved at least 25 meters
         }
 
     return movements
@@ -273,10 +277,12 @@ def compute_group_metrics(group_buses, snapshot_time, movements): # Takes a grou
     in_service_buses = [bus for bus in group_buses if is_in_service(bus)] # A list of only in-service buses
     in_service_bus_ids = {bus.get("vehicle_ref") for bus in in_service_buses if bus.get("vehicle_ref")} # Build a set of their Bus IDs
 
-    layover_count = sum( # Counts how many buses in the group are detected as layover
+    # Count buses that are currently in a layover
+    layover_count = sum(
         1 for bus in group_buses
-        if str(bus.get("progress_status") or "").strip().lower() == "layover"
+        if is_layover(bus)
     )
+
 
     in_service_movements = [ # Get movement info for only in-service buses (that have movement info)
         movements[bus.get("vehicle_ref")]
@@ -305,7 +311,15 @@ def compute_group_metrics(group_buses, snapshot_time, movements): # Takes a grou
 
     # Compute the 3 route ratios
     in_service_ratio = round(in_service_bus_count / total_buses, 3) if total_buses > 0 else None
-    movement_ratio = round(moving_count / in_service_bus_count, 3) if in_service_bus_count > 0 else None
+
+    # Count only buses seen in both snapshots to have enough data for us to measure movement
+    movement_eligible_count = len(in_service_movements)
+    movement_ratio = (
+        round(moving_count / movement_eligible_count, 3)
+        if movement_eligible_count > 0
+        else None
+    )
+
     layover_ratio = round(layover_count / total_buses, 3) if total_buses > 0 else None
 
     # Send those values to metrics.py to get subscores, overall score, and health label
