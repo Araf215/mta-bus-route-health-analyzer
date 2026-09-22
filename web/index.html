@@ -27,9 +27,9 @@
   <!-- Nav Bar: redirects back to my portfolio and also my name label -->
   <nav class="navbar">
     <div class="container nav-inner">
-      <a href="index.html" class="brand">Aoanul "Araf" Hoque</a>
+      <a href="https://arafhoque.com" class="brand">Aoanul "Araf" Hoque</a>
       <div class="nav-links">
-        <a href="index.html">Back to Portfolio</a>
+        <a href="https://arafhoque.com">Back to Portfolio</a>
       </div>
     </div>
   </nav>
@@ -38,10 +38,10 @@
     <div class="container hero-content">
       <!-- Introduction: Website Description, name, and tags -->
       <p class="eyebrow">Independent Engineering Project • Live MTA Bus System Analysis</p>
-      <h1>MTA Route Health Monitor</h1>
+      <h1>MTA Route Health Monitor [BETA]</h1>
       <p class="subtitle">
         A live dashboard that tracks what is happening on MTA bus routes using real-time bus data.
-        This version focuses on practical route health signals, like how many buses are in service, how many are in layover,
+        This version focuses on custom route-health signals, like how many buses are in service, how many are in layover,
         and how actively buses on the route are moving over time.
       </p>
     </div>
@@ -79,9 +79,9 @@
       <!-- Project overview and more into specifics -->
       <h2>Project Overview</h2>
       <p>
-        This project turns live MTA bus data into a dashboard that shows how a route is performing in real time.
-        It tracks the current buses on a selected route, highlights which buses are actively in service,
-        identifies layovers, measures short-term movement, and summarizes those signals into an easy-to-read view of route health.
+      This project turns live MTA bus data into a real-time dashboard that shows how a route is performing. 
+      It tracks the buses currently on a selected route, highlights which buses are actively in service, 
+      identifies layovers, measures movement over a ten-minute interval, and summarizes those signals into a Route Health score.
       </p>
       <div id="scoreBox" class="score-box">Loading live metrics...</div>
     </section>
@@ -102,8 +102,8 @@
 
     <section class="info-grid">
       <div class="content-card">
-        <!-- Updated every minute. Current Route Snapshot with stat cards. -->
-        <h2>Current Route Snapshot (Updated Every Minute)</h2>
+        <!-- Updated every 5 minutes. Current Route Snapshot with stat cards. -->
+        <h2>Current Route Snapshot (Updated Every 10 Minutes)</h2>
         <div class="summary-grid">
           <div class="mini-stat">
             <span class="mini-stat-label">Total Buses</span>
@@ -138,7 +138,7 @@
 
       <div class="content-card">
         <!-- A short summary of what the metrics actually mean. For viewers benefit.  -->
-        <h2>System Status</h2>
+        <h2>Route Status</h2>
         <div id="systemStatus" class="status-list">
           <div class="status-pill">Loading current route health...</div>
         </div>
@@ -184,7 +184,7 @@
 
     <section class="chart-grid">
       <!-- Recent trend charts use smoothed data so short-term API noise does not disturb -->
-      <!-- How many buses are in-service, layover, moving, and total buses (last 5 minutes)  -->
+      <!-- How many buses are in-service, layover, moving, and total buses (last 20 minutes)  -->
       <div class="content-card chart-card">
         <h2>Buses Over Time (Smoothed)</h2>
         <div class="chart-wrap">
