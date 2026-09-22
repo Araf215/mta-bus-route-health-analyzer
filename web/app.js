@@ -1,19 +1,25 @@
 // Chart + map objects
-// Reuse chart objects between refreshes
+// Reuse chart and map instances between refreshes so rerenders stay clean.
 let trendChart;
 let movementChart;
 let liveMap;
 let mapMarkersLayer;
 
-// Frontend refreshes once a minute to match backend timing.
-// The chart window is kept short so it stays readable.
-// Match backend refresh timing
-// Show only the recent trend window
-const REFRESH_MS = 60000;
-const CHART_WINDOW_MINUTES = 5;
+// Frontend refresh timing should match backend timing.
+// The page pulls new processed data every 5 minutes.
+// The charts display the last 30 minutes in 5-minute buckets.
+const REFRESH_MS = 300000;        // 5 minutes
+const CHART_WINDOW_MINUTES = 30;  // show last 30 minutes
+const CHART_BUCKET_MINUTES = 5;   // one bucket per backend update
 
-// Shared UI colors so the page stays consistent with the portfolio theme
-// Keep colors in one place
+// These should match the backend configuration.
+// A bus is only counted as moving if it reaches this movement rate.
+// Current displayed values are smoothed using this many recent snapshots.
+const BACKEND_POLL_INTERVAL_MINUTES = 10;
+const MOVING_THRESHOLD_METERS_PER_MINUTE = 25;
+const SMOOTHING_WINDOW_SNAPSHOTS = 5;
+
+// Shared UI colors so charts, cards, and map markers stay consistent.
 const UI = {
   colors: {
     primary: "#69b86f",
@@ -28,24 +34,19 @@ const UI = {
   }
 };
 
-// This helps prevent older fetches from rendering after newer ones.
-// Only the newest request is allowed to update the page.
-// Ignore stale fetch results
+// Request tracking prevents older fetches from overwriting newer ones.
 let latestRequestId = 0;
 let refreshTimer = null;
 
-// Shared live dataset for all routes
-// Store the latest processed backend data
+// Shared live dataset for all routes.
+// selectedRouteKey stores the currently selected borough|route|direction key.
 let allRoutesData = null;
 let selectedRouteKey = null;
 
-// Pull in the processed JSON that the backend keeps updating
-// Add a timestamp to avoid browser caching
+// Fetch the processed backend JSON.
+// no-store avoids browser caching so the dashboard always uses fresh data.
 async function loadLiveMetrics() {
-  const response = await fetch(
-    `../data/processed/all_routes_live_metrics.json?ts=${Date.now()}`,
-    { cache: "no-store" }
-  );
+  const response = await fetch("/api/data", { cache: "no-store" });
 
   if (!response.ok) {
     throw new Error("Processed live metrics file not found.");
@@ -54,8 +55,7 @@ async function loadLiveMetrics() {
   return response.json();
 }
 
-// Format times nicely for cards and graph labels
-// Used in cards and charts
+// Format timestamps for cards, popups, and chart-adjacent labels.
 function formatTimeLabel(iso, includeSeconds = false) {
   if (!iso) return "N/A";
 
@@ -67,43 +67,38 @@ function formatTimeLabel(iso, includeSeconds = false) {
   });
 }
 
-// Generic number formatter
-// Good for scores and averages
+// Generic decimal formatter for scores and averages.
 function formatNumber(value, digits = 1) {
   if (value == null || Number.isNaN(Number(value))) return "N/A";
   return Number(value).toFixed(digits);
 }
 
-// Whole-number display for bus counts
-// Round counts to clean whole numbers
+// Whole-number formatter for vehicle counts.
 function formatInteger(value) {
   if (value == null || Number.isNaN(Number(value))) return "--";
   return String(Math.round(Number(value)));
 }
 
-// Turn a ratio like 0.8 into 80.0%
-// Used for movement and service ratios
+// Convert a ratio like 0.82 into 82.0%.
 function formatPercentFromRatio(value) {
   if (value == null || Number.isNaN(Number(value))) return "N/A";
   return `${(Number(value) * 100).toFixed(1)}%`;
 }
 
-// Movement shown in meters
-// Used in cards and table
+// Distance display helper.
 function formatMeters(value) {
   if (value == null || Number.isNaN(Number(value))) return "N/A";
   return `${Number(value).toFixed(1)} m`;
 }
 
-// Speed shown in meters per minute
-// Used for movement rate display
+// Movement-rate display helper.
 function formatMetersPerMinute(value) {
   if (value == null || Number.isNaN(Number(value))) return "N/A";
   return `${Number(value).toFixed(1)} m/min`;
 }
 
-// Simple helper to make labels look cleaner
-// Convert things like to_south_ferry into To South Ferry
+// Make route and direction labels easier to read.
+// Example: to_south_ferry -> To South Ferry
 function titleCase(value) {
   if (!value) return "N/A";
   return String(value)
@@ -111,43 +106,48 @@ function titleCase(value) {
     .replace(/\b\w/g, char => char.toUpperCase());
 }
 
-// Prefer the backend direction label when available
+// Prefer the backend direction label when available.
 function getRouteDirectionLabel(routeData) {
   return routeData?.direction_label || titleCase(routeData?.direction || "unknown");
 }
 
-// Grab the current processed timestamp
-// Used to anchor the chart window
+// Get the current snapshot timestamp for the selected route.
 function getLatestSnapshotTime(routeData) {
   return routeData?.current?.timestamp ? new Date(routeData.current.timestamp) : null;
 }
 
-// Build the rolling 5-minute graph window.
-// This version keeps the smoothed data.
-// Round every point down to the minute
-// Fill missing minutes with the last seen value
+// Build the rolling chart window from saved history.
+// This uses the chart history array, not the smoothing buffer.
+// Missing buckets borrow the last seen point so the charts stay visually continuous.
 function getRollingWindowPoints(history, currentTimestamp) {
   if (!Array.isArray(history) || !currentTimestamp) return [];
 
   const end = new Date(currentTimestamp);
   end.setSeconds(0, 0);
 
+  const minute = end.getMinutes();
+  end.setMinutes(minute - (minute % CHART_BUCKET_MINUTES));
+
   const start = new Date(end.getTime() - CHART_WINDOW_MINUTES * 60 * 1000);
 
   const filtered = history
     .filter(point => point.timestamp)
-    .map(point => ({
-      ...point,
-      roundedTime: (() => {
-        const dt = new Date(point.timestamp);
-        dt.setSeconds(0, 0);
-        return dt;
-      })()
-    }))
+    .map(point => {
+      const dt = new Date(point.timestamp);
+      dt.setSeconds(0, 0);
+
+      const bucketMinute = dt.getMinutes() - (dt.getMinutes() % CHART_BUCKET_MINUTES);
+      dt.setMinutes(bucketMinute);
+
+      return {
+        ...point,
+        roundedTime: dt
+      };
+    })
     .filter(point => point.roundedTime >= start && point.roundedTime <= end);
 
   const buckets = [];
-  for (let i = CHART_WINDOW_MINUTES; i >= 0; i--) {
+  for (let i = CHART_WINDOW_MINUTES; i >= 0; i -= CHART_BUCKET_MINUTES) {
     const bucketTime = new Date(end.getTime() - i * 60 * 1000);
     buckets.push({
       bucketTime,
@@ -163,7 +163,6 @@ function getRollingWindowPoints(history, currentTimestamp) {
     }
   }
 
-  // Carry the last known value forward so the graph stays readable
   let lastSeen = null;
   return buckets.map(bucket => {
     if (bucket.point) lastSeen = bucket.point;
@@ -174,25 +173,39 @@ function getRollingWindowPoints(history, currentTimestamp) {
   });
 }
 
-// Get the exact current snapshot values
-// Prefer raw_latest when it exists
+// The backend may expose raw_latest for the unsmoothed latest snapshot.
+// If it exists, use it for direct count-based UI calculations.
 function getLiveSnapshot(current) {
   return current.raw_latest || current;
 }
 
-// Build current ratios directly from current counts
-// Recalculate ratios from current values for the UI
+// Recalculate ratios directly from the current counts shown by the backend.
+// This keeps the frontend display consistent even if precomputed ratios are absent.
 function getCurrentDerivedMetrics(current) {
   const live = getLiveSnapshot(current);
 
   const totalBuses = Number(live.total_vehicles ?? 0);
   const inServiceBuses = Number(live.in_service_vehicles ?? 0);
   const layoverBuses = Number(live.layover_vehicles ?? 0);
-  const movingBuses = Number(live.moving_vehicles ?? 0);
 
-  const inServiceRatio = totalBuses > 0 ? inServiceBuses / totalBuses : null;
-  const movementRatio = inServiceBuses > 0 ? movingBuses / inServiceBuses : null;
-  const layoverRatio = totalBuses > 0 ? layoverBuses / totalBuses : null;
+  const inServiceRatio =
+    live.in_service_ratio != null
+      ? Number(live.in_service_ratio)
+      : totalBuses > 0
+        ? inServiceBuses / totalBuses
+        : null;
+
+  const movementRatio =
+    live.movement_ratio != null
+      ? Number(live.movement_ratio)
+      : null;
+
+  const layoverRatio =
+    live.layover_ratio != null
+      ? Number(live.layover_ratio)
+      : totalBuses > 0
+        ? layoverBuses / totalBuses
+        : null;
 
   return {
     ...live,
@@ -202,16 +215,13 @@ function getCurrentDerivedMetrics(current) {
   };
 }
 
-// Pull route keys from the full processed dataset
-// Route keys look like borough|route|direction
+// Get every available borough|route|direction key from the loaded dataset.
 function getAllRouteKeys() {
   return Object.keys(allRoutesData?.routes || {}).sort();
 }
 
-// Populate all dropdown filters once data loads
-// Build borough first
-// Then routes
-// Then directions
+// Build the borough, route, and direction dropdowns.
+// The selections cascade in order: borough -> route -> direction.
 function populateFilters() {
   const boroughSelect = document.getElementById("boroughSelect");
   const routeSelect = document.getElementById("routeSelect");
@@ -225,7 +235,7 @@ function populateFilters() {
     .map(borough => `<option value="${borough}">${borough}</option>`)
     .join("");
 
-  // Rebuild route list when borough changes
+  // Rebuild the route list whenever the borough changes.
   function updateRouteOptions() {
     const borough = boroughSelect.value;
 
@@ -242,7 +252,7 @@ function populateFilters() {
     updateDirectionOptions();
   }
 
-  // Rebuild direction list when route changes
+  // Rebuild the direction list whenever the route changes.
   function updateDirectionOptions() {
     const borough = boroughSelect.value;
     const route = routeSelect.value;
@@ -272,7 +282,7 @@ function populateFilters() {
     updateSelectedRoute();
   }
 
-  // Build the selected route key from the 3 dropdowns
+  // Store the currently selected route key, then rerender the page.
   function updateSelectedRoute() {
     selectedRouteKey = [
       boroughSelect.value,
@@ -290,8 +300,8 @@ function populateFilters() {
   updateRouteOptions();
 }
 
-// Top summary box under Project Overview
-// Main quick route summary
+// Main summary box for the selected route.
+// This exposes the movement threshold and smoothing settings clearly.
 function renderScoreBox(routeData) {
   const live = getCurrentDerivedMetrics(routeData.current);
 
@@ -306,12 +316,14 @@ function renderScoreBox(routeData) {
     <div class="score-line"><strong>Movement Ratio:</strong> ${formatPercentFromRatio(live.movement_ratio)}</div>
     <div class="score-line"><strong>Average Movement:</strong> ${formatMeters(live.average_moved_meters)}</div>
     <div class="score-line"><strong>Average Speed:</strong> ${formatMetersPerMinute(live.average_meters_per_minute)}</div>
+    <div class="score-line"><strong>Moving Threshold:</strong> A bus counts as moving at ${MOVING_THRESHOLD_METERS_PER_MINUTE} m/min or higher</div>
+    <div class="score-line"><strong>Smoothing:</strong> Median of the last ${SMOOTHING_WINDOW_SNAPSHOTS} backend snapshots</div>
     <div class="score-line"><strong>Last Updated:</strong> ${formatTimeLabel(routeData.current.timestamp, true)}</div>
+    <div class="score-line"><strong>Update Frequency:</strong> Every ${BACKEND_POLL_INTERVAL_MINUTES} minutes</div>
   `;
 }
 
-// Current route snapshot stat cards
-// Smaller stat boxes below the summary
+// Small stat cards beneath the main score box.
 function renderMiniStats(current) {
   const live = getCurrentDerivedMetrics(current);
 
@@ -324,14 +336,13 @@ function renderMiniStats(current) {
   document.getElementById("avgSpeedStat").textContent = formatMetersPerMinute(live.average_meters_per_minute);
 }
 
-// Small summary box
-// Short readable interpretation for users
+// Plain-language status notes for the selected route.
 function renderSystemStatus(current) {
   const live = getCurrentDerivedMetrics(current);
   const container = document.getElementById("systemStatus");
   const notes = [];
 
-  notes.push(`Health score is ${formatNumber(current.health_score, 1)} out of 10, which is currently rated ${current.health_label}.`);
+  notes.push(`Health score is currently rated as ${current.health_label}, with a Route Health score of ${formatNumber(current.health_score, 1)} out of 10.`);
 
   if (live.total_vehicles != null && live.in_service_vehicles != null) {
     notes.push(`${formatInteger(live.in_service_vehicles)} of ${formatInteger(live.total_vehicles)} detected buses are currently being counted as in service.`);
@@ -342,18 +353,17 @@ function renderSystemStatus(current) {
   }
 
   if (live.moving_vehicles != null && live.in_service_vehicles != null) {
-    notes.push(`${formatInteger(live.moving_vehicles)} of ${formatInteger(live.in_service_vehicles)} in-service buses are currently counted as moving.`);
+    notes.push(`${formatInteger(live.moving_vehicles)} of ${formatInteger(live.in_service_vehicles)} in-service buses are currently counted as moving using a ${MOVING_THRESHOLD_METERS_PER_MINUTE} m/min threshold.`);
   }
 
   if (live.average_moved_meters != null) {
     notes.push(`The average detected bus moved about ${formatMeters(live.average_moved_meters)} between recent snapshots.`);
   }
-
   container.innerHTML = notes.map(note => `<div class="status-pill">${note}</div>`).join("");
 }
 
-// Explain how the route health score is built
-// Show what each score part means
+// Explain how the route health score is calculated.
+// This is intentionally more transparent about both formulas and assumptions.
 function renderScoreBreakdown(current) {
   const score = current.score_breakdown || {};
   const weights = score.weights || {};
@@ -371,33 +381,39 @@ function renderScoreBreakdown(current) {
   container.innerHTML = `
     <div class="metric-pill">
       <strong>${inServiceWeight}% In-Service Ratio</strong><br>
-      Shows how many detected buses are actively serving the route right now<br><br>
+      Shows how many detected buses are actively serving the route right now.<br><br>
       <strong>Formula</strong><br>
+      In-Service Ratio = In-Service Buses / Total Detected Buses<br>
       In-Service Score = In-Service Ratio × 10
     </div>
     <div class="metric-pill">
       <strong>${movementWeight}% Movement Ratio</strong><br>
-      Helps show whether in-service buses are actually progressing between snapshots (Every Minute)<br><br>
+      Shows how many in-service buses appear to be progressing between snapshots.<br><br>
+      <strong>When is a bus counted as moving?</strong><br>
+      A bus is counted as moving only if its estimated movement rate is at least ${MOVING_THRESHOLD_METERS_PER_MINUTE} meters per minute between snapshots.<br><br>
       <strong>Formula</strong><br>
+      Movement Ratio = Moving In-Service Buses / In-Service Buses<br>
       Movement Score = Movement Ratio × 10
     </div>
     <div class="metric-pill">
       <strong>${layoverWeight}% Layover Ratio</strong><br>
-      Reflects how many detected buses are inactive at that moment<br><br>
+      Reflects how many detected buses are inactive at that moment.<br><br>
       <strong>Formula</strong><br>
+      Layover Ratio = Layover Buses / Total Detected Buses<br>
       Layover Score = 10 - (Layover Ratio × 10)
     </div>
     <div class="metric-pill">
       <strong>Current Score Breakdown</strong><br>
       In-Service Score: ${inServiceScore}<br>
       Movement Score: ${movementScore}<br>
-      Layover Score: ${layoverScore}<br><br>
-    </div>
+      Layover Score: ${layoverScore}<br>
+      Overall Route Health: ${overallScore} / 10<br><br>
+      <strong>Data note</strong><br>
+      Current route snapshot values are based on the latest available snapshot, while the graphs use the median of the last ${SMOOTHING_WINDOW_SNAPSHOTS} backend snapshots to smooth short-term API noise. </div>
   `;
 }
 
-// Buses over time chart
-// Chart for counts over time
+// Chart bus counts across the selected time window.
 function createTrendChart(historyWindow) {
   const ctx = document.getElementById("trendChart").getContext("2d");
 
@@ -469,14 +485,13 @@ function createTrendChart(historyWindow) {
         x: {
           title: {
             display: true,
-            text: "Time (Last 5 Minutes)",
+            text: `Time (Last ${CHART_WINDOW_MINUTES} Minutes)`,
             color: UI.colors.text,
             font: { weight: "700" }
           },
           ticks: {
             color: UI.colors.muted,
-            autoSkip: true,
-            maxTicksLimit: 6
+            autoSkip: false
           },
           grid: {
             color: UI.colors.border
@@ -503,8 +518,7 @@ function createTrendChart(historyWindow) {
   });
 }
 
-// Movement chart
-// Chart for movement ratio and avg movement
+// Chart movement ratio alongside average distance moved.
 function createMovementChart(historyWindow) {
   const ctx = document.getElementById("movementChart").getContext("2d");
 
@@ -560,14 +574,13 @@ function createMovementChart(historyWindow) {
         x: {
           title: {
             display: true,
-            text: "Time (Last 5 Minutes)",
+            text: `Time (Last ${CHART_WINDOW_MINUTES} Minutes)`,
             color: UI.colors.text,
             font: { weight: "700" }
           },
           ticks: {
             color: UI.colors.muted,
-            autoSkip: true,
-            maxTicksLimit: 6
+            autoSkip: false
           },
           grid: {
             color: UI.colors.border
@@ -614,7 +627,7 @@ function createMovementChart(historyWindow) {
   });
 }
 
-// Create the Leaflet map
+// Create the Leaflet map only once.
 function initializeMap() {
   if (liveMap) return;
 
@@ -628,10 +641,10 @@ function initializeMap() {
   mapMarkersLayer = L.layerGroup().addTo(liveMap);
 }
 
-// Decide marker color based on current bus state
-// Gray for layover
-// Green for moving
-// Yellow for stationary in service
+// Choose map marker colors based on the bus state.
+// Gray = out of service / layover
+// Green = moving in service
+// Yellow = in service but not counted as moving
 function getMarkerStyle(bus) {
   if (!bus.is_in_service) {
     return {
@@ -650,12 +663,10 @@ function getMarkerStyle(bus) {
   return {
     color: UI.colors.stationary,
     fillColor: "#f3c96a"
-    };
+  };
 }
 
-// Draw the live buses on the map
-// Clear old markers first
-// Then draw the current route buses
+// Render live bus markers for the selected route.
 function renderMapBuses(current) {
   initializeMap();
   mapMarkersLayer.clearLayers();
@@ -689,7 +700,8 @@ function renderMapBuses(current) {
       Proximity: ${bus.arrival_proximity_text || "N/A"}<br>
       In service: ${bus.is_in_service ? "Yes" : "No"}<br>
       Position movement: ${formatMeters(bus.moved_meters)}<br>
-      Speed estimate: ${formatMetersPerMinute(bus.meters_per_minute)}
+      Speed estimate: ${formatMetersPerMinute(bus.meters_per_minute)}<br>
+      Counted as moving: ${bus.is_moving_by_position ? `Yes (>= ${MOVING_THRESHOLD_METERS_PER_MINUTE} m/min)` : `No (< ${MOVING_THRESHOLD_METERS_PER_MINUTE} m/min or insufficient data)`}
     `);
 
     marker.addTo(mapMarkersLayer);
@@ -701,14 +713,13 @@ function renderMapBuses(current) {
     liveMap.fitBounds(latLngs, { padding: [28, 28] });
   }
 
-  // Fix map sizing after DOM updates
+  // Fix map sizing after DOM updates.
   setTimeout(() => {
     liveMap.invalidateSize();
   }, 100);
 }
 
-// Fill in the live bus table
-// Show one row per bus on the selected route
+// Build the live bus table for the selected route.
 function renderBusTable(current) {
   const buses = current.vehicles_seen || [];
   const body = document.getElementById("busTableBody");
@@ -730,8 +741,7 @@ function renderBusTable(current) {
   `).join("");
 }
 
-// Problem / solution copy
-// Static writeup text for the page
+// Static project problem/solution text.
 function renderProblemSolutionText() {
   document.getElementById("problemText").innerHTML = `
     MTA bus service is often criticized for being slow and inconsistent, but the live data behind it is not very easy to read on its own.
@@ -745,35 +755,36 @@ function renderProblemSolutionText() {
   `;
 }
 
-// Method card copy
-// Static method explanation
+// Static method text.
+// This now explicitly explains the movement threshold and smoothing basis.
 function renderMethodText() {
   document.getElementById("methodText").innerHTML = `
-   This project works by collecting a live snapshot of MTA bus data from the MTA API every 60 seconds. 
+   This project works by collecting a live snapshot of MTA bus data from the MTA API every ${BACKEND_POLL_INTERVAL_MINUTES} minutes.
+   I chose a ${BACKEND_POLL_INTERVAL_MINUTES}-minute polling interval to reduce backend load and make lightweight deployment more practical while still preserving useful live route trends.
    After each snapshot is fetched, the data is processed to identify the buses on the selected route,
-    determine which ones appear to be in service, estimate how many are moving between snapshots, 
-    and calculate the custom route health metrics used in the dashboard. The site then displays the current route snapshot, 
-    the live route map using Leaflet.js, the score breakdown, and the other route details based on that processed data. 
-    For the graphs, I chose to smooth the values so the trends are easier to read and less affected by short-term API noise or sudden jumps in detected bus counts.
+   determine which ones appear to be in service, estimate how many are moving between snapshots,
+   and calculate the custom route health metrics used in the dashboard.
+   A bus is currently counted as moving only if its estimated movement rate is at least ${MOVING_THRESHOLD_METERS_PER_MINUTE} meters per minute between snapshots.
+   The site then displays the current route snapshot, the live route map using Leaflet.js, the score breakdown, and the other route details based on that processed data.
+   To reduce short-term API noise, the displayed current metrics are smoothed using the median of the last ${SMOOTHING_WINDOW_SNAPSHOTS} processed snapshots rather than the full chart history.
   `;
 }
 
-// Limits card copy
-// Static limitations explanation
+// Static limitations text.
 function renderLimitsText() {
   document.getElementById("limitsText").innerHTML = `
-    The metrics used in this project are not the strongest possible measures of route health. 
-    Bunching and headways would likely be more meaningful, but the MTA API often returned missing or unreliable values when I attempted to use them. 
-    That is more likely a limitation of the live feed than proof that those conditions rarely occur. 
-    Because of that, I focused on the signals the API provided more consistently: in-service ratio, movement ratio, and layover ratio. 
-    These metrics are meant to capture how actively buses on a route appear to be serving riders in real time, 
+    The metrics used in this project are not the strongest possible measures of route health.
+    Bunching and headways would likely be more meaningful, but the MTA API often returned missing or unreliable values when I attempted to use them.
+    That is more likely a limitation of the live feed than proof that those conditions rarely occur.
+    Because of that, I focused on the signals the API provided more consistently: in-service count, movement count, and layover count.
+    These metrics are meant to capture how actively buses on a route appear to be serving riders in real time,
     without depending on official schedule comparisons. Since each route is different in length, ridership, and service pattern,
-    I relied more on ratios than raw counts so the results are more comparable across routes.
+    I relied on ratios than raw counts so the results are more comparable across routes.
+    The movement threshold and smoothing choices are custom project settings, so they should be understood as transparent assumptions rather than official MTA standards.
   `;
 }
 
-// Render everything for the currently selected route
-// Main render function for one selected route
+// Render every UI section for the selected route.
 function renderSelectedRoute() {
   if (!allRoutesData || !selectedRouteKey || !allRoutesData.routes[selectedRouteKey]) return;
 
@@ -795,8 +806,7 @@ function renderSelectedRoute() {
   renderBusTable(current);
 }
 
-// One fetch, one render pass
-// Pull latest backend data and redraw the page
+// Pull the newest backend data and rerender the dashboard.
 async function refreshDashboard() {
   const requestId = ++latestRequestId;
 
@@ -807,7 +817,8 @@ async function refreshDashboard() {
 
     allRoutesData = data;
 
-    // First load builds the filter UI
+    // First load creates the dropdowns.
+    // Later refreshes keep the same selection and simply rerender the page.
     if (!selectedRouteKey) {
       populateFilters();
     } else {
@@ -822,14 +833,13 @@ async function refreshDashboard() {
   }
 }
 
-// Start the auto-refresh loop
-// Refresh on a fixed timer
+// Keep the frontend synced to the backend on a fixed interval.
 function startAutoRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(refreshDashboard, REFRESH_MS);
 }
 
-// Load once right away, then keep updating
-// First page load
+// Initial page load.
 refreshDashboard();
 startAutoRefresh();
+ 
