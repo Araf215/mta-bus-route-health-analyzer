@@ -14,11 +14,32 @@ load_dotenv()
 
 POLL_INTERVAL_SECONDS = int(os.getenv("POLL_INTERVAL_SECONDS", "60")) # grab interval, default = 60
 
-# File paths for raw data, processed data
-RAW_PATH = os.path.join("data", "raw", "all_buses_snapshots.jsonl")
-PROCESSED_DIR = os.path.join("data", "processed")
+# Find the main project folder by going one folder above /scripts
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Full path to the raw snapshot file created by fetch_data.py
+RAW_PATH = os.path.join(
+    PROJECT_ROOT,
+    "data",
+    "raw",
+    "all_buses_snapshots.jsonl"
+)
+
+# Folder where processed dashboard data is stored
+PROCESSED_DIR = os.path.join(
+    PROJECT_ROOT,
+    "data",
+    "processed"
+)
+
+# Create data/processed if it doesn't already exist
 os.makedirs(PROCESSED_DIR, exist_ok=True)
-OUTPUT_PATH = os.path.join(PROCESSED_DIR, "all_routes_live_metrics.json")
+
+# Full output path used by the frontend
+OUTPUT_PATH = os.path.join(
+    PROCESSED_DIR,
+    "all_routes_live_metrics.json"
+)
 
 MAX_HISTORY_POINTS = int(os.getenv("MAX_RAW_SNAPSHOTS", "90")) # Only 90 snapshots can be processed at once (efficiency)
 SMOOTHING_WINDOW = 5 # Use the last 5 computed route points to reduce short-term api noise

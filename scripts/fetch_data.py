@@ -14,10 +14,20 @@ API_KEY = os.getenv("MTA_API_KEY") # Load API Key
 POLL_INTERVAL_SECONDS = int(os.getenv("POLL_INTERVAL_SECONDS", "60")) # Grab custom interval, default =  60
 MAX_RAW_SNAPSHOTS = int(os.getenv("MAX_RAW_SNAPSHOTS", "180")) # Load max number of raw snapshots kept
 
-RAW_DIR = os.path.join("data", "raw") # data/raw var
-os.makedirs(RAW_DIR, exist_ok=True) # creates data/raw if it doesn't exist
+# Find the main project folder by going one folder above /scripts
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-RAW_OUTPUT = os.path.join(RAW_DIR, "all_buses_snapshots.jsonl") # full output (where the raw snapshots are saved)
+# Folder where raw MTA snapshots are stored
+RAW_DIR = os.path.join(PROJECT_ROOT, "data", "raw")
+
+# Create data/raw if it doesn't already exist
+os.makedirs(RAW_DIR, exist_ok=True)
+
+# Full file path where all raw snapshots are saved
+RAW_OUTPUT = os.path.join(
+    RAW_DIR,
+    "all_buses_snapshots.jsonl"
+)
 
 VEHICLE_MONITORING_URL = "https://bustime.mta.info/api/siri/vehicle-monitoring.json" # API Endpoint  (bus id, route, direction, location, etc)
 

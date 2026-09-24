@@ -38,7 +38,7 @@
     <div class="container hero-content">
       <!-- Introduction: Website Description, name, and tags -->
       <p class="eyebrow">Independent Engineering Project • Live MTA Bus System Analysis</p>
-      <h1>MTA Route Health Monitor [BETA]</h1>
+      <h1>MTA Route Health Monitor</h1>
       <p class="subtitle">
         A live dashboard that tracks what is happening on MTA bus routes using real-time bus data.
         This version focuses on custom route-health signals, like how many buses are in service, how many are in layover,
@@ -81,7 +81,7 @@
       <p>
       This project turns live MTA bus data into a real-time dashboard that shows how a route is performing. 
       It tracks the buses currently on a selected route, highlights which buses are actively in service, 
-      identifies layovers, measures movement over a ten-minute interval, and summarizes those signals into a Route Health score.
+      identifies layovers, measures movement over a five-minute interval, and summarizes those signals into a Route Health score.
       </p>
       <div id="scoreBox" class="score-box">Loading live metrics...</div>
     </section>
@@ -93,7 +93,7 @@
           <h2>Live Route Map</h2>
           <p class="section-subtitle">
             Green markers are moving in-service buses, yellow markers are in-service but mostly stationary,
-            and gray markers are layovers or no-progress buses.
+            and gray markers are buses currently identified as being in layover.
           </p>
         </div>
       </div>
@@ -103,7 +103,7 @@
     <section class="info-grid">
       <div class="content-card">
         <!-- Updated every 5 minutes. Current Route Snapshot with stat cards. -->
-        <h2>Current Route Snapshot (Updated Every 10 Minutes)</h2>
+        <h2>Current Route Snapshot (Updated Every 5 Minutes)</h2>
         <div class="summary-grid">
           <div class="mini-stat">
             <span class="mini-stat-label">Total Buses</span>
