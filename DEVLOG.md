@@ -1,35 +1,56 @@
 # Development Log
 
+## 09/24/2026
+
+### Open Source Pipeline and Frontend Update
+
+This update focused on fixing the local open source workflow and bringing the dashboard closer to the live version.
+
+#### Changes
+
+- Fixed the Python file paths so raw and processed data always go into the main `data/` folder instead of accidentally creating folders inside `scripts/`.
+
+- Changed the local version to use 5-minute snapshots and made the collector, processor, frontend refresh, and charts use the same timing.
+
+- Updated the frontend to load the processed JSON directly from `data/processed/all_routes_live_metrics.json`.
+
+- Brought the open source dashboard closer to the live site's layout, wording, and metric descriptions.
+
+- Made the current route info use the latest snapshot while keeping the trend charts smoothed.
+
+- Cleaned up the route status and movement-ratio wording so it matches what the backend is actually calculating.
+
+- Updated the setup instructions to match the current folder structure and script names.
+
+### Files Updated
+
+- `scripts/fetch_data.py`
+- `scripts/process_data.py`
+- `web/app.js`
+- `web/index.html`
+- `README.md`
+
+
 ## 09/22/2026
 
 ### Route Health Metric Fixes
 
-This update focused on making the route health calculations more accurate and keeping the open source version aligned with the live project.
+This update focused on improving the accuracy of the route health metrics.
 
 #### Changes
 
-- Updated how buses are classified as in service.
-  - Buses marked as `noProgress` are no longer automatically treated as out of service.
-  - Only buses identified as being in a layover are excluded from active service.
-
-- Improved movement detection.
-  - Movement is now based on meters per minute instead of a fixed distance between snapshots.
-  - This makes the calculation more consistent if the polling interval changes.
-
-- Fixed the movement ratio calculation.
-  - The movement ratio now only uses buses that have enough data to compare their current and previous positions.
-  - Buses without a previous snapshot are no longer indirectly treated as stationary.
-
-- Updated the frontend to use the movement ratio calculated by the backend instead of recalculating it differently in the browser.
-
-- Updated the time frontend values and wording to better match the current data collection interval.
+- Changed service classification so only buses in layover are counted as out of service.
+- Changed movement detection to use meters per minute instead of just distance moved.
+- Fixed the movement ratio so it only uses buses that actually have enough data to compare movement.
+- Updated the frontend to use the movement ratio calculated by the backend.
+- Cleaned up the dashboard timing and wording so it matches how the backend works.
 
 ### Files Updated
 
 - `scripts/process_data.py`
-- `public/app.js`
-- `public/index.html`
+- `web/app.js`
+- `web/index.html`
 
 ### Notes
 
-These changes do not alter the overall route health scoring weights. The goal of this update was to improve the accuracy of the data being fed into the existing scoring system rather than redesign the scoring model. There will be future updates utilizing updated MTA API features to help create a better scoring model.
+The overall route health scoring weights were not changed. These updates focused on improving the data used by the existing scoring model.
